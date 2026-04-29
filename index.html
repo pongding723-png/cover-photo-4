@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINE 群組封面產生器 - 簡約專業版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f1f5f9;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .main-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 畫布容器 */
+        .preview-area {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            aspect-ratio: 1 / 1;
+        }
+
+        #preview-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: 1rem;
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* LINE 圓形裁切遮罩 */
+        .circle-mask::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(248, 250, 252, 0.85);
+            clip-path: circle(50% at center);
+            border: 2px dashed rgba(0,0,0,0.1);
+        }
+
+        #image-upload {
+            display: none;
+        }
+
+        /* 針對手機觸控的滑桿優化 */
+        input[type="range"] {
+            height: 2.5rem;
+            cursor: pointer;
+        }
+
+        .color-btn.active {
+            ring: 4px;
+            ring-color: #cbd5e1;
+            border-color: #1e293b;
+        }
+    </style>
+</head>
+<body class="p-2 md:p-8">
+
+    <div class="main-container rounded-3xl overflow-hidden border border-slate-200">
+        <div class="grid grid-cols-1 lg:grid-cols-12">
+            
+            <!-- 左側控制面板 -->
+            <div class="lg:col-span-5 p-5 md:p-8 bg-slate-50 border-b lg:border-b-0 lg:border-r border-slate-200">
+                <header class="mb-6">
+                    <h1 class="text-xl md:text-2xl font-black text-slate-800 flex items-center">
+                        <span class="bg-blue-800 text-white p-2 rounded-xl mr-3 shadow-md">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </span>
+                        專案群組封面照片產生器
+                    </h1>
+                </header>
+
+                <div class="space-y-5">
+                    <!-- 1. 照片上傳 -->
+                    <div class="space-y-2">
+                        <label class="text-xs font-black text-slate-500 uppercase tracking-widest">第一步：上傳背景照片</label>
+                        <label for="image-upload" class="flex items-center justify-center w-full p-6 border-2 border-dashed border-blue-300 rounded-2xl bg-blue-50 hover:bg-blue-100 transition cursor-pointer">
+                            <div class="text-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto text-blue-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <span class="text-sm font-bold text-blue-800" id="upload-status">點擊上傳警徽照片</span>
+                            </div>
+                        </label>
+                        <input type="file" id="image-upload" accept="image/*">
+                    </div>
+
+                    <!-- 2. 名稱輸入 -->
+                    <div class="space-y-2">
+                        <label class="text-xs font-black text-slate-500 uppercase tracking-widest">第二步：群組名稱</label>
+                        <textarea id="text-input" rows="2" class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-800 outline-none transition text-lg font-bold" placeholder="輸入名稱 (支援換行)..."></textarea>
+                    </div>
+
+                    <!-- 3. 文字常用顏色選擇 -->
+                    <div class="space-y-2">
+                        <label class="text-xs font-black text-slate-500 uppercase tracking-widest">第三步：選擇文字顏色</label>
+                        <div class="flex flex-wrap gap-3 p-1" id="text-color-presets">
+                            <button class="color-btn w-10 h-10 rounded-full border-2 border-white shadow-sm active" style="background-color: #002D62;" data-color="#002D62" title="藏青藍"></button>
+                            <button class="color-btn w-10 h-10 rounded-full border-2 border-white shadow-sm" style="background-color: #000000;" data-color="#000000" title="純黑"></button>
+                            <button class="color-btn w-10 h-10 rounded-full border-2 border-white shadow-sm" style="background-color: #374151;" data-color="#374151" title="戰術灰"></button>
+                            <button class="color-btn w-10 h-10 rounded-full border-2 border-white shadow-sm" style="background-color: #B8860B;" data-color="#B8860B" title="警徽金"></button>
+                            <button class="color-btn w-10 h-10 rounded-full border-2 border-white shadow-sm" style="background-color: #B91C1C;" data-color="#B91C1C" title="嚴肅紅"></button>
+                        </div>
+                    </div>
+
+                    <!-- 4. 數值微調 -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-4 shadow-sm">
+                        <div class="space-y-1">
+                            <div class="flex justify-between items-center">
+                                <label class="text-[10px] font-black text-slate-500 uppercase">字體大小</label>
+                                <input type="range" id="font-size" min="30" max="220" value="95" class="w-2/3 h-8 accent-blue-800">
+                            </div>
+                        </div>
+                        <div class="space-y-1 border-t pt-2 border-slate-100">
+                            <div class="flex justify-between items-center">
+                                <label class="text-[10px] font-black text-slate-500 uppercase">背景透明度</label>
+                                <input type="range" id="watermark-opacity" min="0" max="100" value="30" class="w-2/3 h-8 accent-slate-600">
+                            </div>
+                        </div>
+                        <div class="space-y-1 border-t pt-2 border-slate-100">
+                            <div class="flex justify-between items-center">
+                                <label class="text-[10px] font-black text-slate-500 uppercase">背景縮放</label>
+                                <input type="range" id="watermark-scale" min="10" max="250" value="100" class="w-2/3 h-8 accent-blue-600">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="download-btn" class="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-2xl transition shadow-xl flex items-center justify-center gap-2 active:scale-95">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        下載照片 (PNG)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 右側預覽區 -->
+            <div class="lg:col-span-7 p-6 md:p-12 flex flex-col items-center justify-center bg-slate-100 min-h-[400px]">
+                <div class="mb-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-3">
+                    <span class="w-8 h-px bg-slate-300"></span>
+                    LIVE PREVIEW
+                    <span class="w-8 h-px bg-slate-300"></span>
+                </div>
+                
+                <div id="canvas-wrapper" class="preview-area circle-mask">
+                    <canvas id="preview-canvas" width="800" height="800"></canvas>
+                </div>
+
+                <div class="mt-8 flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-md border border-slate-200">
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="show-circle" checked class="sr-only peer">
+                        <div class="relative w-12 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-700"></div>
+                        <span class="ms-4 text-xs font-black text-slate-600">模擬 LINE 裁切預覽</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 圖片隱藏容器 -->
+    <img id="user-image" class="hidden" alt="Uploaded Logo">
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('preview-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const textInput = document.getElementById('text-input');
+            const fontSizeInput = document.getElementById('font-size');
+            const downloadBtn = document.getElementById('download-btn');
+            const showCircle = document.getElementById('show-circle');
+            const canvasWrapper = document.getElementById('canvas-wrapper');
+            const watermarkOpacity = document.getElementById('watermark-opacity');
+            const watermarkScale = document.getElementById('watermark-scale');
+            const imageUpload = document.getElementById('image-upload');
+            const uploadStatus = document.getElementById('upload-status');
+            const userImg = document.getElementById('user-image');
+            const colorPresets = document.getElementById('text-color-presets');
+
+            const currentBg = '#FFFFFF';
+            let currentTextColor = '#002D62'; // 預設藏青色
+            let hasImage = false;
+
+            function updateCanvas() {
+                const size = 800; 
+                const fullText = textInput.value || "預覽文字";
+                const fontSize = parseInt(fontSizeInput.value);
+                const opacity = parseInt(watermarkOpacity.value) / 100;
+                const scaleFactor = parseInt(watermarkScale.value) / 100;
+
+                // 1. 白色背景
+                ctx.fillStyle = currentBg;
+                ctx.fillRect(0, 0, size, size);
+
+                // 2. 繪製照片 (Cover 模式 + 自訂縮放)
+                if (hasImage && userImg.complete && userImg.naturalWidth > 0) {
+                    ctx.save();
+                    ctx.globalAlpha = opacity;
+                    const scaleToCover = Math.max(size / userImg.width, size / userImg.height);
+                    const dw = userImg.width * scaleToCover * scaleFactor;
+                    const dh = userImg.height * scaleToCover * scaleFactor;
+                    ctx.drawImage(userImg, (size - dw) / 2, (size - dh) / 2, dw, dh);
+                    ctx.restore();
+                }
+
+                // 3. 繪製文字
+                ctx.save();
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = currentTextColor;
+                ctx.font = `900 ${fontSize}px "Noto Sans TC", sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const maxWidth = size * 0.86;
+                const lines = [];
+                const rawLines = fullText.split('\n');
+
+                rawLines.forEach(rawLine => {
+                    let currentLine = '';
+                    const chars = rawLine.split('');
+                    for (let i = 0; i < chars.length; i++) {
+                        let testLine = currentLine + chars[i];
+                        if (ctx.measureText(testLine).width > maxWidth && i > 0) {
+                            lines.push(currentLine);
+                            currentLine = chars[i];
+                        } else {
+                            currentLine = testLine;
+                        }
+                    }
+                    lines.push(currentLine);
+                });
+
+                const lineHeight = fontSize * 1.32;
+                const totalH = lines.length * lineHeight;
+                let startY = (size - totalH) / 2 + (lineHeight / 2);
+
+                lines.forEach((line, index) => {
+                    ctx.fillText(line, size / 2, startY + (index * lineHeight));
+                });
+                ctx.restore();
+            }
+
+            // 處理上傳
+            if (imageUpload) {
+                imageUpload.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            userImg.onload = () => {
+                                hasImage = true;
+                                if (uploadStatus) {
+                                    uploadStatus.textContent = "✅ 照片已成功載入";
+                                    uploadStatus.classList.add('text-green-600');
+                                }
+                                updateCanvas();
+                            };
+                            userImg.src = event.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+
+            // 處理顏色選擇
+            if (colorPresets) {
+                colorPresets.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.color-btn');
+                    if (btn) {
+                        currentTextColor = btn.getAttribute('data-color');
+                        // 更新 UI 狀態
+                        document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active', 'ring-4', 'ring-slate-300'));
+                        btn.classList.add('active', 'ring-4', 'ring-slate-300');
+                        updateCanvas();
+                    }
+                });
+            }
+
+            // 監聽變動
+            [textInput, fontSizeInput, watermarkOpacity, watermarkScale].forEach(el => {
+                if (el) el.addEventListener('input', updateCanvas);
+            });
+
+            if (showCircle) {
+                showCircle.addEventListener('change', (e) => {
+                    if (canvasWrapper) canvasWrapper.classList.toggle('circle-mask', e.target.checked);
+                });
+            }
+
+            // 下載
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', () => {
+                    const link = document.createElement('a');
+                    const fileName = textInput.value ? textInput.value.split('\n')[0].substring(0, 10) : 'Cover';
+                    link.download = `${fileName}_${Date.now()}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                });
+            }
+
+            updateCanvas();
+        });
+    </script>
+</body>
+</html>
